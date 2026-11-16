@@ -20,15 +20,15 @@ Decisions: name lonewrt-build · licence MIT · history squash · maturity exper
 | A11 | N/A no non-text content | |
 | A12 | PASS | outside pointers are public URLs |
 | A13 | PASS | first-party; actions referenced, not vendored |
-| A14 | DEFERRED (owner) | 2FA line to refresh from the laptop |
+| A14 | PASS | 2FA on, confirmed from the owner's machine |
 | A15 | PASS | no dependents |
 | A16 | PASS | public, template, not a fork, owner only |
 | A17 | N/A no workflow fires on push | |
 | B01 | PASS | published set = all except the private record |
 | B02 | PASS | MIT in LICENSE and README |
 | B03 | PASS | the owner's own repository |
-| B04 | DEFERRED after the owner's upload | the route runs only on GitHub; test run after the push |
-| B05 | PASS | README walked; terms present; holds once lonewrt 0.2.0 is out |
+| B04 | PASS | test runs on GitHub; passes from lonewrt 0.2.1, earlier releases fixed upstream |
+| B05 | PASS | README walked; terms present; holds from lonewrt 0.2.1 |
 | B06 | PASS | the build script's gates and failures tested in lonewrt |
 | B07 | PASS | download hosts listed; the profile goes only into the run's download |
 | B08 | PASS | two official actions pinned by SHA |
@@ -36,9 +36,9 @@ Decisions: name lonewrt-build · licence MIT · history squash · maturity exper
 | B10 | PASS | zizmor clean, read-only permissions, SHA pins |
 | B11 | PASS | three files |
 | B12 | PASS | links point at lonewrt pages that exist |
-| B13 | DEFERRED (owner) | secret scanning and push protection on the new repository |
-| B14 | DEFERRED after the owner's upload | test run and rendered README |
-| B15 | DEFERRED after the owner's upload | status update after the push |
+| B13 | PASS | secret scanning and push protection on; reports go to lonewrt |
+| B14 | PASS | test run on the newest release passed; README rendered |
+| B15 | PASS | records closed, status updated |
 | B16 | N/A no agent instructions shipped | |
 | L13 | FINDINGS 1 resolved | 1 kept: the run's own GitHub token |
 | L14 | PASS | one manual trigger, one download, test mode explicit |
