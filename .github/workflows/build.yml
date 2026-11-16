@@ -1,0 +1,104 @@
+# Builds a lonewrt image from the profile in the secret LW_PROFILE.
+#
+# This file is only a wrapper (lonewrt SPEC R53h, R53k, D118): it finds the lonewrt release you
+# chose, checks it out, and runs ci/github-run.sh from that release. Every step of a build (the
+# checks, the dependencies, the build, the tests, the summary) lives in that script, so a fix
+# reaches you with the next lonewrt release, with no change to this file.
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "lonewrt release to build, for example 0.1.0 (empty: the newest release)"
+        type: string
+        required: false
+        default: ""
+      name:
+        description: "Profile name; it names the files of the download (router-sysupgrade.bin)"
+        type: string
+        required: false
+        default: router
+      test:
+        description: "Test run: only for a public repository, builds made-up values and ignores LW_PROFILE"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      # R53j: an empty version is the newest release (not a pre-release); a version without a
+      # release stops the run here and names it. The input goes through env, never into the script.
+      - name: Find the lonewrt release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          repo=DamianPala/lonewrt
+          pattern='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+          version=${INPUT_VERSION//[[:space:]]/}
+          version=${version#v}
+          if [ -z "$version" ]; then
+            tag=$(gh api "repos/$repo/releases/latest" --jq .tag_name) || {
+              echo "::error::Could not find the newest release of $repo. Start the run again with a version, for example 0.1.0."
+              exit 1
+            }
+            version=${tag#v}
+          elif ! [[ $version =~ $pattern ]]; then
+            echo "::error::The version must look like 0.1.0 or v0.1.0, got an entry of ${#version} characters."
+            exit 1
+          elif ! gh api "repos/$repo/releases/tags/v$version" --jq .tag_name >/dev/null 2>&1; then
+            echo "::error::lonewrt has no release $version (looked for the tag v$version in $repo). Check the version, or leave it empty for the newest release."
+            exit 1
+          fi
+          if ! [[ $version =~ $pattern ]]; then
+            echo "::error::The newest release of $repo has an unexpected tag. Start the run again with a version, for example 0.1.0."
+            exit 1
+          fi
+          echo "lonewrt release: $version"
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+
+      - name: Check out lonewrt at that release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: DamianPala/lonewrt
+          ref: refs/tags/v${{ steps.release.outputs.version }}
+          path: lonewrt
+          persist-credentials: false
+
+      # The one step that sees the secret. It prints neither the secret nor the profile file.
+      # The directory lw-out is what the next step uploads: the script fills it with the image
+      # and its manifest and nothing else (R53e), and leaves it out when anything fails.
+      - name: Build and test
+        env:
+          LW_PROFILE: ${{ secrets.LW_PROFILE }}
+          LW_NAME: ${{ inputs.name }}
+          LW_TEST: ${{ inputs.test }}
+          LW_REPO_PRIVATE: ${{ github.event.repository.private }}
+          LW_VERSION: ${{ steps.release.outputs.version }}
+          LW_OUT_DIR: ${{ github.workspace }}/lw-out
+        run: |
+          if [ ! -f lonewrt/ci/github-run.sh ]; then
+            echo "::error::lonewrt $LW_VERSION cannot be built on GitHub (it has no ci/github-run.sh). Start the run with a newer version."
+            exit 1
+          fi
+          bash lonewrt/ci/github-run.sh
+
+      # An upload cannot be a step of the script, so it is here; it runs only when the build step
+      # succeeded (the default condition), so a failed run uploads nothing (R53a, R53d). R53g: the
+      # download goes away after 7 days; the summary of the run names that day.
+      - name: Upload the image
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lonewrt-${{ inputs.name || 'router' }}-${{ steps.release.outputs.version }}
+          path: ${{ github.workspace }}/lw-out
+          retention-days: 7
+          if-no-files-found: error
